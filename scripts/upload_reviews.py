@@ -12,7 +12,7 @@ from datetime import date, timedelta
 from dotenv import load_dotenv
 from pinecone import Pinecone
 
-from app.reviews import POSTS_DIR, load_reviews, to_records
+from app.reviews import POSTS_DIR, added_since, load_reviews, to_records
 
 load_dotenv()
 
@@ -43,7 +43,7 @@ def main():
 
     if args.days is not None:
         cutoff = (date.today() - timedelta(days=args.days)).isoformat()
-        reviews = [review for review in reviews if review.date >= cutoff]
+        reviews = added_since(reviews, cutoff)
     print(f"Parsed {len(reviews)} reviews, skipped {len(skipped)}")
     for reason in skipped:
         print(f"  skipped {reason}")
