@@ -3,10 +3,11 @@
 Run from the repo root: python -m evals.run_evals
 """
 import random
-import re
 import statistics
 
-from app.rag import answer, search_reviews
+from pydantic import BaseModel
+
+from app.rag import answer, openai_client, search_reviews
 from app.reviews import load_reviews
 
 SEED = 7
@@ -28,10 +29,23 @@ def lookup_question(review):
     return f"What treadmill and bike score did {review.game} get?"
 
 
-def score_in_text(text, score):
-    # "out of 3" and "3/3" name the scale, not the score
-    text = re.sub(r"(out of|/)\s*3(\.0+)?", "", text)
-    return any(float(n) == score for n in re.findall(r"\d+(?:\.\d+)?", text))
+class StatedScore(BaseModel):
+    treadmill_score: float | None
+
+
+def stated_treadmill_score(answer_text):
+    """An LLM judge, since numbers in an answer can also be game titles or other scores."""
+    response = openai_client().responses.parse(
+        model="gpt-4.1-mini",
+        temperature=0,
+        text_format=StatedScore,
+        instructions="""Read this answer about a video game. Return the treadmill and
+        bike compatibility score it states, as a number out of 3. Ignore game titles
+        and any other scores, like gameplay or overall. Return null if it doesn't
+        state one.""",
+        input=answer_text,
+    )
+    return response.output_parsed.treadmill_score
 
 
 def retrieval_eval(sample):
@@ -51,7 +65,7 @@ def answer_eval(sample):
         for review in sample:
             messages = [{"role": "user", "content": lookup_question(review)}]
             text, _ = answer(messages, top_k=top_k or 1, use_rag=top_k is not None)
-            right += score_in_text(text, review.treadmill)
+            right += stated_treadmill_score(text) == review.treadmill
         label = "no RAG" if top_k is None else f"top {top_k:>2}"
         print(f"  {label}: {right / len(sample):.0%}")
 

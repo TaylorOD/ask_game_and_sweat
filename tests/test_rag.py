@@ -1,6 +1,5 @@
 from app import rag
 from app.rag import SearchPlan, to_filter
-from evals.run_evals import score_in_text
 
 
 def plan(**scores):
@@ -33,19 +32,22 @@ def test_retrieve_falls_back_when_the_filter_finds_nothing(monkeypatch):
     assert calls == [{"treadmill_score": {"$gte": 3}}, None]
 
 
-def test_planner_sees_the_earlier_question_only_when_there_is_one():
+def test_planner_sees_earlier_turns_only_when_there_are_some():
     first = {"role": "user", "content": "best treadmill game?"}
     reply = {"role": "assistant", "content": "Brotato"}
-    second = {"role": "user", "content": "what about Hades?"}
+    second = {"role": "user", "content": "what is its score?"}
     assert rag.search_question([first]) == "best treadmill game?"
     assert rag.search_question([first, reply, second]) == (
-        "Earlier question: best treadmill game?\nLatest question: what about Hades?"
+        "Earlier question: best treadmill game?\nEarlier answer: Brotato\nLatest question: what is its score?"
     )
 
 
-def test_score_check_ignores_the_scale():
-    assert score_in_text("It scored 2 out of 3.", 2)
-    assert not score_in_text("It scored 2 out of 3.", 3)
-    assert not score_in_text("Treadmill: 2/3", 3)
-    assert score_in_text("It scored 3 out of 3.", 3)
-    assert score_in_text("It scored 3.0 out of 3.", 3)
+def test_long_earlier_answers_are_trimmed_for_the_planner():
+    long_reply = {"role": "assistant", "content": "x" * 5000}
+    question = {"role": "user", "content": "q"}
+    assert len(rag.search_question([question, long_reply, question])) < 600
+
+
+def test_every_excerpt_carries_the_treadmill_score():
+    chunk = {"url": "https://mrgameandsweat.com/hades/", "chunk_text": "Hades, Gameplay", "treadmill_score": 2.5}
+    assert 'treadmill_and_bike_score="2.5"' in rag.system_prompt([chunk])

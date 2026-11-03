@@ -1,4 +1,4 @@
 openai>=2.14.0
-pinecone>=8.0.0
+pinecone>=10.2.0
 python-dotenv>=1.2.1
 pyyaml>=6.0
