@@ -19,6 +19,7 @@ class Review:
     game: str
     slug: str
     date: str
+    added: str
     gameplay: float
     treadmill: float
     computer: float
@@ -59,6 +60,7 @@ def parse_review(text, filename):
         game=game,
         slug=slug,
         date=date,
+        added=str(meta.get("added") or date),  # backfilled reviews have old dates but a new added date
         gameplay=float(scores[0].group(1)),
         treadmill=float(scores[1].group(1)),
         computer=float(scores[2].group(1)),
@@ -75,6 +77,10 @@ def load_reviews(posts_dir=POSTS_DIR):
         except (ValueError, KeyError) as error:
             skipped.append(str(error))
     return reviews, skipped
+
+
+def added_since(reviews, cutoff):
+    return [review for review in reviews if review.added >= cutoff]
 
 
 def to_records(review):
