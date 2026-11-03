@@ -2,7 +2,7 @@ services:
   - type: web
     name: ask-game-and-sweat
     runtime: python
-    plan: starter
+    plan: free
     buildCommand: pip install -r requirements.txt
     # One process on purpose, the rate limits live in memory
     startCommand: uvicorn app.main:create_app --factory --host 0.0.0.0 --port $PORT --workers 1
