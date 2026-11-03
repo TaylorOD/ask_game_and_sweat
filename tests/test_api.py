@@ -1,4 +1,5 @@
 import json
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
@@ -83,6 +84,24 @@ def test_long_question_is_rejected_and_doesnt_count(client):
     assert [ask(client).status_code for _ in range(2)] == [200, 200]
 
 
+def test_long_earlier_question_is_rejected(client):
+    turns = [
+        {"role": "user", "content": "x" * 501},
+        {"role": "assistant", "content": "ok"},
+        {"role": "user", "content": "short"},
+    ]
+    assert ask(client, body={"messages": turns}).status_code == 422
+
+
+def test_long_earlier_answer_is_allowed(client):
+    turns = [
+        {"role": "user", "content": "hi"},
+        {"role": "assistant", "content": "x" * 2000},
+        {"role": "user", "content": "short"},
+    ]
+    assert ask(client, body={"messages": turns}).status_code == 200
+
+
 def test_too_much_history_is_rejected(client):
     assert ask(client, body={"messages": QUESTION["messages"] * 11}).status_code == 422
 
@@ -114,3 +133,25 @@ def test_limiter_window_expires():
     assert not limiter.allow("a")
     now[0] = 11
     assert limiter.allow("a")
+
+
+def test_limiter_forgets_old_visitors():
+    now = [0]
+    limiter = RateLimiter(1, 10, clock=lambda: now[0])
+    for i in range(50):
+        limiter.allow(f"visitor {i}")
+    now[0] = 21
+    limiter.allow("new visitor")
+    assert list(limiter.hits) == ["new visitor"]
+
+
+def test_failed_openai_stream_becomes_an_error(monkeypatch):
+    monkeypatch.setattr(rag, "retrieve", lambda question, top_k: [])
+    monkeypatch.setattr(rag, "model_request", lambda *a, **k: iter([
+        SimpleNamespace(type="response.output_text.delta", delta="hi"),
+        SimpleNamespace(type="response.failed"),
+    ]))
+    stream = rag.stream_answer([{"role": "user", "content": "q"}])
+    assert next(stream) == {"type": "delta", "text": "hi"}
+    with pytest.raises(RuntimeError):
+        next(stream)

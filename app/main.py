@@ -58,8 +58,10 @@ def create_app():
             raise HTTPException(403, "This chat only works on Mr. Game and Sweat.")
 
         messages = [turn.model_dump() for turn in body.messages]
-        question = messages[-1]
-        if question["role"] != "user" or len(question["content"]) > MAX_QUESTION_CHARS:
+        if messages[-1]["role"] != "user":
+            raise HTTPException(422, "The last message has to be a question.")
+        # Earlier questions go to the model too, so a long one can't hide behind a short last one
+        if any(m["role"] == "user" and len(m["content"]) > MAX_QUESTION_CHARS for m in messages):
             raise HTTPException(422, f"Questions can be up to {MAX_QUESTION_CHARS} characters.")
 
         # Check the visitor first, so one person going over doesn't use up the daily cap
