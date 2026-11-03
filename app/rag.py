@@ -140,3 +140,11 @@ def answer(messages, top_k=DEFAULT_TOP_K, use_rag=True):
     chunks = retrieve(search_question(messages), top_k) if use_rag else []
     instructions = system_prompt(chunks) if use_rag else NO_RAG_PROMPT
     return model_request(messages, instructions).output_text, chunks
+
+
+def stream_answer(messages, top_k=DEFAULT_TOP_K):
+    """Yields events for the chat bubble as the answer is written."""
+    chunks = retrieve(search_question(messages), top_k)
+    for event in model_request(messages, system_prompt(chunks), stream=True):
+        if event.type == "response.output_text.delta":
+            yield {"type": "delta", "text": event.delta}
