@@ -1,6 +1,6 @@
 import pytest
 
-from app.reviews import load_reviews, parse_review, to_records
+from app.reviews import added_since, load_reviews, parse_review, to_records
 
 POST = """---
 layout: post
@@ -76,8 +76,17 @@ def test_post_missing_a_score_is_rejected():
 
 def test_real_reviews_parse_cleanly():
     reviews, skipped = load_reviews()
+    assert not skipped
     if not reviews:
         pytest.skip("reviews aren't cloned")
-    assert not skipped
     assert all(0 <= r.overall <= 3 for r in reviews)
     assert all(len(text) > 100 for r in reviews for text in r.sections.values())
+
+
+def test_backfilled_reviews_count_from_when_they_were_added():
+    old_name = "2025-11-04-review-dota-2.md"
+    backfilled = parse_review(POST.replace("author: taylor", "author: taylor\nadded: 2026-11-03"), old_name)
+    not_backfilled = parse_review(POST, old_name)
+    assert backfilled.date == "2025-11-04" and backfilled.added == "2026-11-03"
+    assert not_backfilled.added == "2025-11-04"
+    assert added_since([backfilled, not_backfilled], "2026-10-27") == [backfilled]
