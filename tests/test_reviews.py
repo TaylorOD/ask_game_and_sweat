@@ -76,8 +76,8 @@ def test_post_missing_a_score_is_rejected():
 
 def test_real_reviews_parse_cleanly():
     reviews, skipped = load_reviews()
+    assert not skipped
     if not reviews:
         pytest.skip("reviews aren't cloned")
-    assert not skipped
     assert all(0 <= r.overall <= 3 for r in reviews)
     assert all(len(text) > 100 for r in reviews for text in r.sections.values())
