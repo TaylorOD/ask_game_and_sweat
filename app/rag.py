@@ -157,3 +157,5 @@ def stream_answer(messages, top_k=DEFAULT_TOP_K):
     for event in model_request(messages, system_prompt(chunks), stream=True):
         if event.type == "response.output_text.delta":
             yield {"type": "delta", "text": event.delta}
+        elif event.type in ("response.failed", "error"):
+            raise RuntimeError(f"OpenAI stream failed: {event.type}")
