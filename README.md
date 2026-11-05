@@ -33,6 +33,22 @@ These limits share the free tokens out fairly:
 
 The limits live in memory, so they reset if the server restarts. The real ceiling is Groq's free plan, which was about 8000 tokens a minute and 200000 a day when I built this.
 
+## What I used to build this
+
+| What | What it does |
+| --- | --- |
+| [Groq](https://groq.com) | Runs the model, `openai/gpt-oss-20b`, on the free plan |
+| [Pinecone](https://www.pinecone.io) | Stores the review sections and searches them, using its `llama-text-embed-v2` embeddings |
+| [OpenAI Python library](https://github.com/openai/openai-python) | Talks to Groq, which works with the same API |
+| [FastAPI](https://fastapi.tiangolo.com) and [Uvicorn](https://www.uvicorn.org) | The API the bubble calls, including the streaming |
+| [Render](https://render.com) | Free hosting for the API |
+| [GitHub Actions](https://github.com/features/actions) | Runs the tests and uploads new reviews every day |
+| [pytest](https://pytest.org) and [HTTPX](https://www.python-httpx.org) | The tests, plus my own evals to measure answer quality |
+| PyYAML and python-dotenv | Reads the scores on each review and the keys in `.env` |
+| [Mr. Game and Sweat](https://github.com/TaylorOD/mr-game-and-sweat) | The reviews, and the bubble lives on that site |
+| [GitHub Copilot](https://github.com/features/copilot) | Reviews PRs |
+| [Claude Code](https://claude.com/claude-code) | A lot of the building, testing and PRs |
+
 ## Running it
 
 ```
