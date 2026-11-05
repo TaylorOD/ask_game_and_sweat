@@ -37,7 +37,7 @@ The limits live in memory, so they reset if the server restarts. The real ceilin
 
 | What | What it does |
 | --- | --- |
-| [Groq](https://groq.com) | Runs the model, `openai/gpt-oss-20b`, on the free plan |
+| [Groq](https://groq.com) | Runs the model, `openai/gpt-oss-120b`, on the free plan |
 | [Pinecone](https://www.pinecone.io) | Stores the review sections and searches them, using its `llama-text-embed-v2` embeddings |
 | [OpenAI Python library](https://github.com/openai/openai-python) | Talks to Groq, which works with the same API |
 | [FastAPI](https://fastapi.tiangolo.com) and [Uvicorn](https://www.uvicorn.org) | The API the bubble calls, including the streaming |
