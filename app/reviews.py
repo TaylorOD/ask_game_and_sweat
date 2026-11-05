@@ -72,8 +72,11 @@ def parse_review(text, filename):
 def load_reviews(posts_dir=POSTS_DIR):
     reviews, skipped = [], []
     for path in sorted(Path(posts_dir).glob("*.md")):
+        text = path.read_text(encoding="utf-8")
+        if not CATEGORY_SCORE.search(text) and not OVERALL_SCORE.search(text):
+            continue  # the site also has guides, which have no scores
         try:
-            reviews.append(parse_review(path.read_text(encoding="utf-8"), path.name))
+            reviews.append(parse_review(text, path.name))
         except (ValueError, KeyError) as error:
             skipped.append(str(error))
     return reviews, skipped

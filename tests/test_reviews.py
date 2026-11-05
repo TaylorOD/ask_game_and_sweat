@@ -74,6 +74,16 @@ def test_post_missing_a_score_is_rejected():
         parse_review(POST.replace("### Category Score: 2 out of 3\n", ""), "2024-07-07-x.md")
 
 
+def test_guides_arent_reviews_but_broken_reviews_get_reported(tmp_path):
+    broken = POST.replace("### Category Score: 2 out of 3\n", "")
+    (tmp_path / "2024-07-07-good.md").write_text(POST, encoding="utf-8")
+    (tmp_path / "2024-07-08-guide.md").write_text("---\ntitle: A guide\n---\nSome tips", encoding="utf-8")
+    (tmp_path / "2024-07-09-broken.md").write_text(broken, encoding="utf-8")
+    reviews, skipped = load_reviews(tmp_path)
+    assert [review.slug for review in reviews] == ["good"]
+    assert len(skipped) == 1 and "broken" in skipped[0]
+
+
 def test_real_reviews_parse_cleanly():
     reviews, skipped = load_reviews()
     assert not skipped
