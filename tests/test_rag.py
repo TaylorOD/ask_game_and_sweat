@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 from app import rag
 from app.rag import SearchPlan, to_filter
 
@@ -51,3 +53,21 @@ def test_long_earlier_answers_are_trimmed_for_the_planner():
 def test_every_excerpt_carries_the_treadmill_score():
     chunk = {"url": "https://mrgameandsweat.com/hades/", "chunk_text": "Hades, Gameplay", "treadmill_score": 2.5}
     assert 'treadmill_and_bike_score="2.5"' in rag.system_prompt([chunk])
+
+
+def test_plan_search_asks_for_a_strict_schema(monkeypatch):
+    calls = []
+
+    def create(**options):
+        calls.append(options)
+        content = '{"query": "chill", "min_treadmill_score": 3, "max_treadmill_score": null, "min_overall_score": null}'
+        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=content))])
+
+    fake = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
+    monkeypatch.setattr(rag, "model_client", lambda: fake)
+    result = rag.plan_search("something chill")
+    assert (result.query, result.min_treadmill_score) == ("chill", 3)
+    schema = calls[0]["response_format"]["json_schema"]
+    assert schema["strict"] is True
+    assert schema["schema"]["additionalProperties"] is False
+    assert set(schema["schema"]["required"]) == set(schema["schema"]["properties"])

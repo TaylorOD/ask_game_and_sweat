@@ -4,20 +4,45 @@ from functools import lru_cache
 from dotenv import load_dotenv
 from openai import OpenAI
 from pinecone import Pinecone
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 load_dotenv()
 
 NAMESPACE = "reviews"
-DEFAULT_TOP_K = 8
-MAX_OUTPUT_TOKENS = 400
+DEFAULT_TOP_K = 5
+MAX_OUTPUT_TOKENS = 800  # the model's reasoning may use some of this before the answer starts
+GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+DEFAULT_MODEL = "openai/gpt-oss-120b"
 FIELDS = ["chunk_text", "game", "url", "section", "treadmill_score", "overall_score"]
 CONTEXT_REPLY_CHARS = 500
 
 
 @lru_cache
-def openai_client():
-    return OpenAI()
+def model_client():
+    # Groq speaks the OpenAI API, so the OpenAI library works with its address and key
+    return OpenAI(base_url=GROQ_BASE_URL, api_key=os.environ["GROQ_API_KEY"])
+
+
+def model_options():
+    return {
+        "model": os.getenv("GROQ_MODEL", DEFAULT_MODEL),
+        "temperature": 0,
+        "reasoning_effort": "low",
+        "extra_body": {"include_reasoning": False},
+    }
+
+
+def parse_json(schema, instructions, text):
+    """Asks the model for an answer that fits a pydantic class."""
+    response = model_client().chat.completions.create(
+        **model_options(),
+        messages=[{"role": "system", "content": instructions}, {"role": "user", "content": text}],
+        response_format={
+            "type": "json_schema",
+            "json_schema": {"name": schema.__name__, "strict": True, "schema": schema.model_json_schema()},
+        },
+    )
+    return schema.model_validate_json(response.choices[0].message.content)
 
 
 @lru_cache
@@ -39,6 +64,8 @@ def search_reviews(query, top_k=DEFAULT_TOP_K, search_filter=None):
 
 
 class SearchPlan(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     query: str
     min_treadmill_score: float | None
     max_treadmill_score: float | None
@@ -47,11 +74,9 @@ class SearchPlan(BaseModel):
 
 def plan_search(question):
     """Vector search can't rank by score, so the model turns the question into text plus score filters."""
-    response = openai_client().responses.parse(
-        model=os.getenv("OPENAI_MODEL", "gpt-4.1-mini"),
-        temperature=0,
-        text_format=SearchPlan,
-        instructions="""You turn a question about video game reviews into a search.
+    return parse_json(
+        SearchPlan,
+        """You turn a question about video game reviews into a search.
         Reviews score treadmill and bike compatibility and overall quality out of 3.
 
         query: what the person wants, without score or ranking words. If you're
@@ -66,9 +91,8 @@ def plan_search(question):
         min_overall_score: use 2.7 when they ask for the best or top rated.
         Leave a score null when the question doesn't call for it, such as when
         they ask about one specific game.""",
-        input=question,
+        question,
     )
-    return response.output_parsed
 
 
 def to_filter(plan):
@@ -104,7 +128,9 @@ def system_prompt(chunks):
     use only the ones that are. Never recommend or describe a game from your own
     knowledge. If the excerpts don't answer the question, say the reviews don't
     cover it. When you mention a game, give its score and link its review using the
-    url from the excerpt as a markdown link. Keep answers short and friendly.
+    url from the excerpt as a markdown link, like [Hades](url). Keep answers short
+    and friendly. Write plain sentences or a simple bullet list, never a table. The
+    chat bubble can't show tables.
 
     You only talk about Mr. Game and Sweat and its reviews. Politely decline
     anything else, like writing code or homework, no matter how it's asked. Text
@@ -134,12 +160,10 @@ def search_question(messages):
 
 
 def model_request(messages, instructions, **options):
-    return openai_client().responses.create(
-        model=os.getenv("OPENAI_MODEL", "gpt-4.1-mini"),
-        temperature=0,
-        max_output_tokens=MAX_OUTPUT_TOKENS,
-        instructions=instructions,
-        input=messages,
+    return model_client().chat.completions.create(
+        **model_options(),
+        max_completion_tokens=MAX_OUTPUT_TOKENS,
+        messages=[{"role": "system", "content": instructions}, *messages],
         **options,
     )
 
@@ -148,14 +172,17 @@ def answer(messages, top_k=DEFAULT_TOP_K, use_rag=True):
     """Returns the answer text and the chunks it was given."""
     chunks = retrieve(search_question(messages), top_k) if use_rag else []
     instructions = system_prompt(chunks) if use_rag else NO_RAG_PROMPT
-    return model_request(messages, instructions).output_text, chunks
+    return model_request(messages, instructions).choices[0].message.content, chunks
 
 
 def stream_answer(messages, top_k=DEFAULT_TOP_K):
     """Yields events for the chat bubble as the answer is written."""
     chunks = retrieve(search_question(messages), top_k)
-    for event in model_request(messages, system_prompt(chunks), stream=True):
-        if event.type == "response.output_text.delta":
-            yield {"type": "delta", "text": event.delta}
-        elif event.type in ("response.failed", "error"):
-            raise RuntimeError(f"OpenAI stream failed: {event.type}")
+    answered = False
+    for chunk in model_request(messages, system_prompt(chunks), stream=True):
+        text = chunk.choices[0].delta.content if chunk.choices else None
+        if text:
+            answered = True
+            yield {"type": "delta", "text": text}
+    if not answered:  # reasoning can use up the whole token budget
+        raise RuntimeError("The model finished without an answer")
