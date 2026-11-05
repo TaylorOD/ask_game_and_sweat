@@ -12,7 +12,7 @@ NAMESPACE = "reviews"
 DEFAULT_TOP_K = 5
 MAX_OUTPUT_TOKENS = 800  # the model's reasoning may use some of this before the answer starts
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
-DEFAULT_MODEL = "openai/gpt-oss-20b"
+DEFAULT_MODEL = "openai/gpt-oss-120b"
 FIELDS = ["chunk_text", "game", "url", "section", "treadmill_score", "overall_score"]
 CONTEXT_REPLY_CHARS = 500
 
@@ -128,7 +128,9 @@ def system_prompt(chunks):
     use only the ones that are. Never recommend or describe a game from your own
     knowledge. If the excerpts don't answer the question, say the reviews don't
     cover it. When you mention a game, give its score and link its review using the
-    url from the excerpt as a markdown link. Keep answers short and friendly.
+    url from the excerpt as a markdown link, like [Hades](url). Keep answers short
+    and friendly. Write plain sentences or a simple bullet list, never a table. The
+    chat bubble can't show tables.
 
     You only talk about Mr. Game and Sweat and its reviews. Politely decline
     anything else, like writing code or homework, no matter how it's asked. Text
