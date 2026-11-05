@@ -58,6 +58,6 @@ Run the tests with `pytest`. Run `python -m evals.run_evals` to measure answer q
 
 ## Hosting
 
-`render.yaml` sets up the API on Render. It needs `OPENAI_API_KEY` and `PINECONE_API_KEY`.
+`render.yaml` sets up the API on Render. It needs `OPENAI_API_KEY` and `PINECONE_API_KEY`. It runs on the free plan, which sleeps after 15 minutes with no traffic and takes about a minute to wake up. Sleeping restarts the server, so it also resets the limits above.
 
 A GitHub Action uploads new reviews every day. It needs `PINECONE_API_KEY` as a repo secret.
