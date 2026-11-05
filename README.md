@@ -47,7 +47,6 @@ The limits live in memory, so they reset if the server restarts. The real ceilin
 | PyYAML and python-dotenv | Reads the scores on each review and the keys in `.env` |
 | [Mr. Game and Sweat](https://github.com/TaylorOD/mr-game-and-sweat) | The reviews, and the bubble lives on that site |
 | [GitHub Copilot](https://github.com/features/copilot) | Reviews PRs |
-| [Claude Code](https://claude.com/claude-code) | A lot of the building, testing and PRs |
 
 ## Running it
 
