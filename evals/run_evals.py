@@ -78,7 +78,7 @@ def recommendation_eval(reviews):
     average = statistics.mean(r.treadmill for r in reviews)
     print(f"\nRecommendations: {best} of {len(reviews)} reviews score 3 on treadmill, average {average:.2f}")
     for question in RECOMMENDATIONS:
-        plain = {c["game"]: c["treadmill_score"] for c in search_reviews(question, 10)}
+        plain = {c["game"]: c["treadmill_score"] for c in search_reviews(question, DEFAULT_TOP_K)}
         text, chunks = answer([{"role": "user", "content": question}])
         planned = {c["game"]: c["treadmill_score"] for c in chunks}
         print(f"\n  {question}")

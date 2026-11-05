@@ -178,7 +178,11 @@ def answer(messages, top_k=DEFAULT_TOP_K, use_rag=True):
 def stream_answer(messages, top_k=DEFAULT_TOP_K):
     """Yields events for the chat bubble as the answer is written."""
     chunks = retrieve(search_question(messages), top_k)
+    answered = False
     for chunk in model_request(messages, system_prompt(chunks), stream=True):
         text = chunk.choices[0].delta.content if chunk.choices else None
         if text:
+            answered = True
             yield {"type": "delta", "text": text}
+    if not answered:  # reasoning can use up the whole token budget
+        raise RuntimeError("The model finished without an answer")

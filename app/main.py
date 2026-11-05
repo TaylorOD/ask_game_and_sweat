@@ -25,7 +25,7 @@ MODEL_LIMIT_MESSAGE = "I've hit my free limit for now. Try again in a bit, or br
 
 class Turn(BaseModel):
     role: Literal["user", "assistant"]
-    content: str = Field(min_length=1, max_length=3000)
+    content: str = Field(min_length=1, max_length=5000)  # fits a full 800 token answer
 
 
 class ChatRequest(BaseModel):
