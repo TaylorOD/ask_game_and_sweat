@@ -86,6 +86,18 @@ def test_long_question_is_rejected_and_doesnt_count(client):
     assert [ask(client).status_code for _ in range(2)] == [200, 200]
 
 
+def test_full_length_answer_can_be_sent_back(client):
+    def turns(size):
+        return {"messages": [
+            {"role": "user", "content": "q"},
+            {"role": "assistant", "content": "x" * size},
+            {"role": "user", "content": "and then?"},
+        ]}
+
+    assert ask(client, body=turns(4000)).status_code == 200
+    assert ask(client, body=turns(5001)).status_code == 422
+
+
 def test_long_earlier_question_is_rejected(client):
     turns = [
         {"role": "user", "content": "x" * 501},
@@ -158,6 +170,13 @@ def test_stream_only_yields_answer_text(monkeypatch):
         SimpleNamespace(choices=[]),
     ]))
     assert list(rag.stream_answer([{"role": "user", "content": "q"}])) == [{"type": "delta", "text": "hi"}]
+
+
+def test_stream_with_no_answer_becomes_an_error(monkeypatch):
+    monkeypatch.setattr(rag, "retrieve", lambda question, top_k: [])
+    monkeypatch.setattr(rag, "model_request", lambda *a, **k: iter([SimpleNamespace(choices=[])]))
+    with pytest.raises(RuntimeError):
+        list(rag.stream_answer([{"role": "user", "content": "q"}]))
 
 
 def test_running_out_of_free_tokens_says_so(client, monkeypatch):
