@@ -6,6 +6,7 @@ from typing import Literal
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
+from openai import RateLimitError
 from pydantic import BaseModel, Field
 
 from app import rag
@@ -19,11 +20,12 @@ ONE_DAY = 24 * ONE_HOUR
 DEFAULT_ORIGINS = "https://mrgameandsweat.com,https://www.mrgameandsweat.com"
 DAILY_LIMIT_MESSAGE = "I've hit my limit for today. Come back tomorrow, or browse the reviews in the meantime!"
 VISITOR_LIMIT_MESSAGE = "That's a lot of questions! Give me a little while and try again."
+MODEL_LIMIT_MESSAGE = "I've hit my free limit for now. Try again in a bit, or browse the reviews in the meantime!"
 
 
 class Turn(BaseModel):
     role: Literal["user", "assistant"]
-    content: str = Field(min_length=1, max_length=3000)
+    content: str = Field(min_length=1, max_length=5000)  # fits a full 800 token answer
 
 
 class ChatRequest(BaseModel):
@@ -74,6 +76,9 @@ def create_app():
             try:
                 for event in rag.stream_answer(messages):
                     yield json.dumps(event) + "\n"
+            except RateLimitError:
+                log.warning("Hit the model's rate limit")
+                yield json.dumps({"type": "error", "message": MODEL_LIMIT_MESSAGE}) + "\n"
             except Exception:
                 log.exception("Chat failed")
                 message = "Something went wrong on my end. Please try again."

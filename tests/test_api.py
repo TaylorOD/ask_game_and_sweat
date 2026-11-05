@@ -1,12 +1,14 @@
 import json
 from types import SimpleNamespace
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
+from openai import RateLimitError
 
 from app import rag
 from app.limits import RateLimiter
-from app.main import create_app
+from app.main import MODEL_LIMIT_MESSAGE, create_app
 
 ORIGIN = {"origin": "https://mrgameandsweat.com"}
 QUESTION = {"messages": [{"role": "user", "content": "what should I play?"}]}
@@ -84,6 +86,18 @@ def test_long_question_is_rejected_and_doesnt_count(client):
     assert [ask(client).status_code for _ in range(2)] == [200, 200]
 
 
+def test_full_length_answer_can_be_sent_back(client):
+    def turns(size):
+        return {"messages": [
+            {"role": "user", "content": "q"},
+            {"role": "assistant", "content": "x" * size},
+            {"role": "user", "content": "and then?"},
+        ]}
+
+    assert ask(client, body=turns(4000)).status_code == 200
+    assert ask(client, body=turns(5001)).status_code == 422
+
+
 def test_long_earlier_question_is_rejected(client):
     turns = [
         {"role": "user", "content": "x" * 501},
@@ -145,13 +159,32 @@ def test_limiter_forgets_old_visitors():
     assert list(limiter.hits) == ["new visitor"]
 
 
-def test_failed_openai_stream_becomes_an_error(monkeypatch):
+def test_stream_only_yields_answer_text(monkeypatch):
+    def chunk(content):
+        return SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content=content))])
+
     monkeypatch.setattr(rag, "retrieve", lambda question, top_k: [])
     monkeypatch.setattr(rag, "model_request", lambda *a, **k: iter([
-        SimpleNamespace(type="response.output_text.delta", delta="hi"),
-        SimpleNamespace(type="response.failed"),
+        chunk(None),
+        chunk("hi"),
+        SimpleNamespace(choices=[]),
     ]))
-    stream = rag.stream_answer([{"role": "user", "content": "q"}])
-    assert next(stream) == {"type": "delta", "text": "hi"}
+    assert list(rag.stream_answer([{"role": "user", "content": "q"}])) == [{"type": "delta", "text": "hi"}]
+
+
+def test_stream_with_no_answer_becomes_an_error(monkeypatch):
+    monkeypatch.setattr(rag, "retrieve", lambda question, top_k: [])
+    monkeypatch.setattr(rag, "model_request", lambda *a, **k: iter([SimpleNamespace(choices=[])]))
     with pytest.raises(RuntimeError):
-        next(stream)
+        list(rag.stream_answer([{"role": "user", "content": "q"}]))
+
+
+def test_running_out_of_free_tokens_says_so(client, monkeypatch):
+    def out_of_tokens(messages):
+        response = httpx.Response(429, request=httpx.Request("POST", "https://api.groq.com"))
+        raise RateLimitError("limit for key sk-123", response=response, body=None)
+        yield
+
+    monkeypatch.setattr(rag, "stream_answer", out_of_tokens)
+    event = json.loads(ask(client).text)
+    assert event == {"type": "error", "message": MODEL_LIMIT_MESSAGE}
