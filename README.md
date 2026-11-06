@@ -8,7 +8,7 @@ It has read every review on the site. Ask it what to play on a treadmill and it 
 
 ## Why?
 
-I am building LLMs and LLM projects, and I wanted one on real data with real users. There are almost 400 reviews, which is way too much to paste into a prompt for every question, so it has to find the right ones first.
+I am building LLMs and LLM projects, and I wanted one on real data with real users. There are over 400 reviews, which is way too much to paste into a prompt for every question, so it has to find the right ones first.
 
 ## How?
 
@@ -17,21 +17,6 @@ I am building LLMs and LLM projects, and I wanted one on real data with real use
 3. The sections it finds go to a free model on Groq, and the answer streams back to the bubble
 
 The filters are the fun part. Text search can find a treadmill game but it can't rank by score. Asking for the best treadmill games used to find games averaging 2.4 out of 3. With filters they average 3.0.
-
-## What tech?
-
-| Tech | What it does |
-| --- | --- |
-| Python | The whole project |
-| FastAPI and Uvicorn | The API behind the bubble |
-| OpenAI `gpt-4.1-mini` | Plans the search and writes the answer |
-| Pinecone | Stores the review sections and searches them |
-| `llama-text-embed-v2` | The embedding model, run by Pinecone |
-| Render | Hosts the API |
-| GitHub Actions | Runs the tests and uploads new reviews every day |
-| pytest | Tests |
-
-The reviews come from [Mr. Game and Sweat](https://github.com/TaylorOD/mr-game-and-sweat). Evals are my own script in `evals/`.
 
 ## Keeping costs down
 
@@ -52,6 +37,7 @@ The limits live in memory, so they reset if the server restarts. The real ceilin
 
 | What | What it does |
 | --- | --- |
+| Python | The whole project |
 | [Groq](https://groq.com) | Runs the model, `openai/gpt-oss-120b`, on the free plan |
 | [Pinecone](https://www.pinecone.io) | Stores the review sections and searches them, using its `llama-text-embed-v2` embeddings |
 | [OpenAI Python library](https://github.com/openai/openai-python) | Talks to Groq, which works with the same API |
