@@ -4,11 +4,13 @@
 
 The chatbot behind the "Ask about a game" bubble on [Mr. Game and Sweat](https://mrgameandsweat.com), my site that reviews games you can play while exercising.
 
-It has read every review on the site. Ask it what to play on a treadmill and it answers from the reviews and links you to them.
+Ask it what to play on a treadmill and it searches the indexed reviews, answers from what it finds, and links you to the source.
+
+**[How I built it](docs/README.md)** covers the model, how the reviews become searchable, the score filters, and how I check the answers.
 
 ## Why?
 
-I am building LLMs and LLM projects, and I wanted one on real data with real users. There are over 400 reviews, which is way too much to paste into a prompt for every question, so it has to find the right ones first.
+I am building LLM projects, and I wanted one on real data with real users. There are hundreds of reviews, which is way too much to paste into a prompt for every question, so it has to find the right ones first.
 
 ## How?
 
@@ -16,11 +18,13 @@ I am building LLMs and LLM projects, and I wanted one on real data with real use
 2. The model turns your question into a search plus score filters
 3. The sections it finds go to a free model on Groq, and the answer streams back to the bubble
 
-The filters are the fun part. Text search can find a treadmill game but it can't rank by score. Asking for the best treadmill games used to find games averaging 2.4 out of 3. With filters they average 3.0.
+The filters are the fun part. Text search finds relevant reviews, while score filters let a request for good treadmill games require a treadmill score of 3 out of 3.
+
+This is retrieval augmented generation, or RAG. I built the search and application around an existing model. I did not train or fine tune the model on the reviews.
 
 ## Keeping costs down
 
-The bubble is open to everyone, so it runs on Groq's free plan with no card on file. There is no bill to run up. If the free limit runs out, the bubble says so and people try again later.
+The bubble is open to everyone and uses Groq's free plan. Provider limits can temporarily stop answers, so the app handles those errors and asks people to try again later.
 
 These limits share the free tokens out fairly:
 
@@ -29,9 +33,9 @@ These limits share the free tokens out fairly:
 | Messages per visitor | 10 per hour |
 | Messages overall | 100 per day |
 | Question length | 500 characters |
-| Answer length | 800 tokens |
+| Answer completion budget, including reasoning | 800 tokens |
 
-The limits live in memory, so they reset if the server restarts. The real ceiling is Groq's free plan, which was about 8000 tokens a minute and 200000 a day when I built this.
+The limits live in memory, so they reset if the server restarts. They help control traffic but are not a permanent spending cap. Check the provider account's current quotas and billing settings before changing plans.
 
 ## What I used to build this
 
