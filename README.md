@@ -6,6 +6,8 @@ The chatbot behind the "Ask about a game" bubble on [Mr. Game and Sweat](https:/
 
 Ask it what to play on a treadmill and it searches the indexed reviews, answers from what it finds, and links you to the source.
 
+<img src="docs/bubble.jpg" alt="The Ask Mr. Game and Sweat bubble" width="320">
+
 **[How I built it](docs/README.md)** covers the model, how the reviews become searchable, the score filters, and how I check the answers.
 
 ## Why?
@@ -17,6 +19,16 @@ I am building LLM projects, and I wanted one on real data with real users. There
 1. Every review gets split into its 4 sections and uploaded to Pinecone
 2. The model turns your question into a search plus score filters
 3. The sections it finds go to a free model on Groq, and the answer streams back to the bubble
+
+```mermaid
+flowchart LR
+    reviews[Reviews on Mr. Game and Sweat] -->|daily upload| pinecone[(Pinecone)]
+    you[Your question in the bubble] --> api[FastAPI on Render]
+    api -->|search and score filters| pinecone
+    pinecone -->|matching sections| api
+    api -->|sections and question| groq[gpt-oss-120b on Groq]
+    groq -->|streamed answer with links| you
+```
 
 The filters are the fun part. Text search finds relevant reviews, while score filters let a request for good treadmill games require a treadmill score of 3 out of 3.
 
@@ -83,3 +95,7 @@ Run the tests with `pytest`. Run `python -m evals.run_evals` to measure answer q
 `render.yaml` sets up the API on Render. It needs `GROQ_API_KEY` and `PINECONE_API_KEY`. It runs on the free plan, which sleeps after 15 minutes with no traffic and takes about a minute to wake up. Sleeping restarts the server, so it also resets the limits above.
 
 A GitHub Action uploads new reviews every day. It needs `PINECONE_API_KEY` as a repo secret.
+
+## License
+
+MIT license.
