@@ -10,7 +10,7 @@ from openai import RateLimitError
 from pydantic import BaseModel, Field
 
 from app import rag
-from app.limits import RateLimiter
+from app.budget import BudgetUnavailable, create_budget
 
 log = logging.getLogger("game_and_sweat")
 
@@ -42,8 +42,9 @@ def client_ip(request):
 
 def create_app():
     origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", DEFAULT_ORIGINS).split(",") if o.strip()]
-    per_visitor = RateLimiter(int(os.getenv("MESSAGES_PER_HOUR", "10")), ONE_HOUR)
-    overall = RateLimiter(int(os.getenv("MESSAGES_PER_DAY", "100")), ONE_DAY)
+    budget = create_budget("ask-game-and-sweat")
+    hourly_limit = int(os.getenv("MESSAGES_PER_HOUR", "10"))
+    daily_limit = int(os.getenv("MESSAGES_PER_DAY", "100"))
 
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
     app.add_middleware(
@@ -66,10 +67,16 @@ def create_app():
         if any(m["role"] == "user" and len(m["content"]) > MAX_QUESTION_CHARS for m in messages):
             raise HTTPException(422, f"Questions can be up to {MAX_QUESTION_CHARS} characters.")
 
-        # Check the visitor first, so one person going over doesn't use up the daily cap
-        if not per_visitor.allow(client_ip(request)):
+        try:
+            blocked = budget.reserve([
+                ("visitor", client_ip(request), hourly_limit, ONE_HOUR),
+                ("daily", "all", daily_limit, ONE_DAY),
+            ])
+        except BudgetUnavailable:
+            raise HTTPException(503, "Chat is temporarily unavailable. Try again later.") from None
+        if blocked == "visitor":
             raise HTTPException(429, VISITOR_LIMIT_MESSAGE)
-        if not overall.allow("all"):
+        if blocked:
             raise HTTPException(429, DAILY_LIMIT_MESSAGE)
 
         def events():
