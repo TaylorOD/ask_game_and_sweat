@@ -9,6 +9,21 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: quota-test-only
+          POSTGRES_DB: quotas
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_RATE_LIMIT_DATABASE_URL: postgresql://postgres:quota-test-only@localhost:5432/quotas
     steps:
       - uses: actions/checkout@v4
 

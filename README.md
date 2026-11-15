@@ -47,7 +47,7 @@ These limits share the free tokens out fairly:
 | Question length | 500 characters |
 | Answer completion budget, including reasoning | 800 tokens |
 
-The limits live in memory, so they reset if the server restarts. They help control traffic but are not a permanent spending cap. Check the provider account's current quotas and billing settings before changing plans.
+When PostgreSQL is configured (below), the limits survive restarts and are shared by workers. Local development defaults to memory. They help control traffic but are not a permanent spending cap. Check the provider account's current quotas and billing settings before changing plans.
 
 ## What I used to build this
 
@@ -92,10 +92,29 @@ Run the tests with `pytest`. Run `python -m evals.run_evals` to measure answer q
 
 ## Hosting
 
-`render.yaml` sets up the API on Render. It needs `GROQ_API_KEY` and `PINECONE_API_KEY`. It runs on the free plan, which sleeps after 15 minutes with no traffic and takes about a minute to wake up. Sleeping restarts the server, so it also resets the limits above.
+`render.yaml` sets up the API on Render. It needs `GROQ_API_KEY` and `PINECONE_API_KEY`. It runs on the free plan, which sleeps after 15 minutes with no traffic and takes about a minute to wake up. Configure persistent quotas below so sleeping or redeploying does not reset the limits.
 
 A GitHub Action uploads new reviews every day. It needs `PINECONE_API_KEY` as a repo secret.
 
 ## License
 
 MIT license.
+
+### Persistent chat quotas
+
+Production quotas use PostgreSQL via `RATE_LIMIT_DATABASE_URL`. Provision a dedicated
+quota database and app-specific role, run `sql/chat_budget.sql`, and grant that role
+only CONNECT, schema USAGE, and SELECT/INSERT/DELETE on `chat_budget_hits`. Use a TLS
+connection string (`sslmode=require` for Neon). Never reuse the ReachOutt database
+owner password. Set `REQUIRE_PERSISTENT_LIMITS=true` on the deployed service after
+configuring the URL. Missing configuration then stops startup; database failures
+return 503 before any model call, with no in-memory fallback.
+
+Quotas keep rolling windows and reserve all limits in one transaction across
+workers. Requests consume a slot before the model call, including failed or
+disconnected requests. Expired rows are removed on the next request. Visitor
+subjects are HMACs, never raw IPs. Local development without a URL uses memory.
+Deploy only after the schema and restricted runtime credential are configured.
+Verify by consuming a test quota, restarting the app, and confirming it remains
+blocked. To roll back code, retain the database and do not disable the required
+persistence setting.

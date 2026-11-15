@@ -4,7 +4,7 @@ services:
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    # One process on purpose, the rate limits live in memory
+    # One worker fits the free instance; PostgreSQL quotas also support multiple workers.
     startCommand: uvicorn app.main:create_app --factory --host 0.0.0.0 --port $PORT --workers 1
     healthCheckPath: /healthz
     envVars:
